@@ -1,0 +1,182 @@
+// ==UserScript==
+// @name     MAGGA script
+// @description remove ads from geoguessr pages
+// @version  0.1
+// @author  pass
+// @require  http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js
+// @include        /^(https?)?(\:)?(\/\/)?([^\/]*\.)?geoguessr\.com($|\/.*)/
+// @grant GM.getResourceUrl
+// @resource bg1 https://super-duper.fr/img/magga/bg01.jpg
+// @resource bg2 https://super-duper.fr/img/magga/bg02.jpg
+// @resource bg3 https://super-duper.fr/img/magga/bg03.jpg
+// @resource bg4 https://super-duper.fr/img/magga/bg04.jpg
+// @resource bg5 https://super-duper.fr/img/magga/bg05.jpg
+// @resource bg6 https://super-duper.fr/img/magga/bg06.jpg
+// @resource bg7 https://super-duper.fr/img/magga/bg07.jpg
+// @resource bg8 https://super-duper.fr/img/magga/bg08.jpg
+// @resource bg9 https://super-duper.fr/img/magga/bg09.jpg
+// @resource bg10 https://super-duper.fr/img/magga/bg10.jpg
+// @resource bg11 https://super-duper.fr/img/magga/bg11.jpg
+// @resource bg12 https://super-duper.fr/img/magga/bg12.jpg
+// @resource bg13 https://super-duper.fr/img/magga/bg13.jpg
+// @resource bg14 https://super-duper.fr/img/magga/bg14.jpg
+// @resource bg15 https://super-duper.fr/img/magga/bg15.jpg
+// @resource bg16 https://super-duper.fr/img/magga/bg16.jpg
+// @resource bg17 https://super-duper.fr/img/magga/bg17.jpg
+// @resource bg18 https://super-duper.fr/img/magga/bg18.jpg
+// @resource bg19 https://super-duper.fr/img/magga/bg19.jpg
+// @resource bg20 https://super-duper.fr/img/magga/bg20.jpg
+// @resource bg21 https://super-duper.fr/img/magga/bg21.jpg
+// @resource bg22 https://super-duper.fr/img/magga/bg22.jpg
+// @resource bg23 https://super-duper.fr/img/magga/bg23.jpg
+// @resource bg24 https://super-duper.fr/img/magga/bg24.jpg
+// @resource bg25 https://super-duper.fr/img/magga/bg25.jpg
+// @resource bg26 https://super-duper.fr/img/magga/bg26.jpg
+// @resource bg27 https://super-duper.fr/img/magga/bg27.jpg
+// @resource bg28 https://super-duper.fr/img/magga/bg28.jpg
+// @resource bg29 https://super-duper.fr/img/magga/bg29.jpg
+// @resource bg30 https://super-duper.fr/img/magga/bg30.jpg
+// @resource bg31 https://super-duper.fr/img/magga/bg31.jpg
+// @resource multi_country https://super-duper.fr/img/magga/mappemonde.jpg
+// @resource multi_duel https://super-duper.fr/img/magga/duel.jpg
+// @resource multi_distance https://super-duper.fr/img/magga/distance.jpg
+// @resource multi_season_icon https://super-duper.fr/img/magga/beach.jpg
+// @run-at document-start
+// ==/UserScript==
+// MAke Geoguessr Great Again
+// background images come from Pexel.
+
+var elementList = [ "deal-promo-button_root__nUfyK",
+                   "slanted-button_container__6JmyZ",
+                   "maprunner-signed-in-start-page_backgroundWrapper__LOeXW",
+                   "maprunner-signed-in-start-page_avatar__gAHLT",
+                   "primary-menu-button_flair__DERJi",
+                   "footer_footer__tc8Gv",
+                   "promo-card_card__nNmEk"
+                  ];
+
+
+
+var day = new Date().getDate();
+var background_URL = await GM.getResourceUrl("bg"+day);
+var multi_country_URL = await GM.getResourceUrl("multi_country");
+var multi_duel_URL = await GM.getResourceUrl("multi_duel");
+var multi_distance_URL = await GM.getResourceUrl("multi_distance");
+var multi_season_icon_URL = await GM.getResourceUrl("multi_season_icon");
+var nIntervId = setInterval(removeReturningNodes, 250);
+
+
+
+function removeReturningNodes() {
+    for (var i=0;i<elementList.length;i++) {
+        var el = document.getElementsByClassName(elementList[i]);
+        if (el != undefined) {
+            if (el.length>0) { el[0].style.display = "none";}
+        }
+    }
+
+    removeBackground();
+    changeMultiplayerImages();
+
+
+
+}
+
+function removeBackground() {
+
+    var body = document.getElementsByTagName('body')[0];
+    body.style.background = 'transparent';
+    body.style.backgroundImage = "url("+ background_URL +")";
+    body.style.backgroundRepeat = "no-repeat";
+    body.style.backgroundSize = "100% 100%";
+
+    var backgroundElementList = document.getElementsByClassName("background_backgroundHome__lurxW");
+    if (backgroundElementList != undefined) {
+        if (backgroundElementList.length > 0 ) {
+            let backgroundElement = backgroundElementList[0];
+            $(backgroundElement).removeClass ("background_wrapper__OlrxG");
+            $(backgroundElement).removeClass ("background_backgroundHome__lurxW");
+        }
+    }
+
+      var backgroundList2 = document.getElementsByClassName("background_backgroundMultiplayer__TLhIS");
+        if (backgroundList2 != undefined) {
+        if (backgroundList2.length >0) {
+            let backgroundElement =backgroundList2[0];
+            $(backgroundElement).removeClass ("background_wrapper__OlrxG");
+            $(backgroundElement).removeClass ("background_backgroundMultiplayer__TLhIS");
+        }
+    }
+}
+
+function changeMultiplayerImages() {
+
+ var multiplayerBackgroundList = document.getElementsByClassName("ranked_root__h__6e");
+     if (multiplayerBackgroundList != undefined) {
+        if (multiplayerBackgroundList.length >0) {
+            multiplayerBackgroundList[0].style.backgroundColor = "#0E1F28";
+        }
+     }
+
+  multiplayerBackgroundList = document.getElementsByClassName("tournament-card_card__fkNsg");
+     if (multiplayerBackgroundList != undefined) {
+        if (multiplayerBackgroundList.length >0) {
+            multiplayerBackgroundList[0].style.backgroundColor = "#0E1F28";
+        }
+     }
+
+    var unrankedCountryList = document.getElementsByClassName("unranked_card__6DqeB unranked_brc__xHUjF");
+         if (unrankedCountryList != undefined) {
+        if (unrankedCountryList.length >0) {
+            unrankedCountryList[0].style.backgroundColor = "#0E1F28";
+            unrankedCountryList[0].style.backgroundImage = "url("+ multi_country_URL +")";
+        }
+     }
+
+        var rankedCountryList = document.getElementsByClassName("play_gameModeCard__zSeBo play_active__t661_");
+         if (rankedCountryList != undefined) {
+        if (rankedCountryList.length >0) {
+            rankedCountryList[0].style.backgroundColor = "#0E1F28";
+            rankedCountryList[0].style.backgroundImage = "url("+ multi_country_URL +")";
+        }
+     }
+
+        var rankedDistanceList = document.getElementsByClassName("play_gameModeCard__zSeBo play_active__t661_");
+         if (rankedDistanceList != undefined) {
+        if (rankedDistanceList.length >1) {
+            rankedDistanceList[1].style.backgroundImage = "url("+ multi_distance_URL +")";
+        }
+     }
+
+        var unrankedDistanceList = document.getElementsByClassName("unranked_brd__avH20");
+         if (unrankedDistanceList != undefined) {
+        if (unrankedDistanceList.length >0) {
+            unrankedDistanceList[0].style.backgroundImage = "url("+ multi_distance_URL +")";
+        }
+     }
+
+
+    var rankedDuelList = document.getElementsByClassName("play_gameModeCard__zSeBo play_active__t661_");
+         if (rankedDuelList != undefined) {
+        if (rankedDuelList.length >2) {
+            rankedDuelList[2].style.backgroundImage = "url("+ multi_duel_URL +")";
+        }
+     }
+
+        var unrankedDuelList = document.getElementsByClassName("unranked_card__6DqeB unranked_td__EL4y2");
+         if (unrankedDuelList != undefined) {
+        if (unrankedDuelList.length >0) {
+            unrankedDuelList[0].style.backgroundImage = "url("+ multi_duel_URL +")";
+        }
+     }
+    var seasonIconList = document.getElementsByClassName("season-icon_icon__bBPys");
+     if (seasonIconList != undefined) {
+        if (seasonIconList.length >0) {
+            seasonIconList[0].firstChild.src = multi_season_icon_URL;
+            seasonIconList[0].firstChild.style.borderRadius = "7px";
+            seasonIconList[0].firstChild.width = "100%";
+            seasonIconList[0].firstChild.height = "50%";
+        }
+     }
+}
+
