@@ -1,45 +1,12 @@
 // ==UserScript==
 // @name     MAGGA script
 // @description remove ads from geoguessr pages
-// @version  0.5
+// @version  1.0
 // @author  .flamby.
 // @require  http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js
 // @include        /^(https?)?(\:)?(\/\/)?([^\/]*\.)?geoguessr\.com($|\/.*)/
 // @grant GM.getResourceUrl
-// @resource bg1 https://super-duper.fr/img/magga/bg01.jpg
-// @resource bg2 https://super-duper.fr/img/magga/bg02.jpg
-// @resource bg3 https://super-duper.fr/img/magga/bg03.jpg
-// @resource bg4 https://super-duper.fr/img/magga/bg04.jpg
-// @resource bg5 https://super-duper.fr/img/magga/bg05.jpg
-// @resource bg6 https://super-duper.fr/img/magga/bg06.jpg
-// @resource bg7 https://super-duper.fr/img/magga/bg07.jpg
-// @resource bg8 https://super-duper.fr/img/magga/bg08.jpg
-// @resource bg9 https://super-duper.fr/img/magga/bg09.jpg
-// @resource bg10 https://super-duper.fr/img/magga/bg10.jpg
-// @resource bg11 https://super-duper.fr/img/magga/bg11.jpg
-// @resource bg12 https://super-duper.fr/img/magga/bg12.jpg
-// @resource bg13 https://super-duper.fr/img/magga/bg13.jpg
-// @resource bg14 https://super-duper.fr/img/magga/bg14.jpg
-// @resource bg15 https://super-duper.fr/img/magga/bg15.jpg
-// @resource bg16 https://super-duper.fr/img/magga/bg16.jpg
-// @resource bg17 https://super-duper.fr/img/magga/bg17.jpg
-// @resource bg18 https://super-duper.fr/img/magga/bg18.jpg
-// @resource bg19 https://super-duper.fr/img/magga/bg19.jpg
-// @resource bg20 https://super-duper.fr/img/magga/bg20.jpg
-// @resource bg21 https://super-duper.fr/img/magga/bg21.jpg
-// @resource bg22 https://super-duper.fr/img/magga/bg22.jpg
-// @resource bg23 https://super-duper.fr/img/magga/bg23.jpg
-// @resource bg24 https://super-duper.fr/img/magga/bg24.jpg
-// @resource bg25 https://super-duper.fr/img/magga/bg25.jpg
-// @resource bg26 https://super-duper.fr/img/magga/bg26.jpg
-// @resource bg27 https://super-duper.fr/img/magga/bg27.jpg
-// @resource bg28 https://super-duper.fr/img/magga/bg28.jpg
-// @resource bg29 https://super-duper.fr/img/magga/bg29.jpg
-// @resource bg30 https://super-duper.fr/img/magga/bg30.jpg
-// @resource bg31 https://super-duper.fr/img/magga/bg31.jpg
-// @resource bg32 https://super-duper.fr/img/magga/bg32.jpg
-// @resource bg33 https://super-duper.fr/img/magga/bg33.jpg
-// @resource bg34 https://super-duper.fr/img/magga/bg34.jpg
+// @resource bg_image https://super-duper.fr/img/magga/bg001.jpg
 // @resource multi_country https://super-duper.fr/img/magga/flag.png
 // @resource multi_duel https://super-duper.fr/img/magga/duel.png
 // @resource multi_distance https://super-duper.fr/img/magga/distance.png
@@ -54,16 +21,15 @@
 // @run-at document-start
 // ==/UserScript==
 // MAke Geoguessr Great Again
-// background images come from Pexel.
+// background images come from Pexel free library.
 
 
 //------------------------------------------------------------------------------------------------------------OPTIONS ----------------------------------------------------------------------------------\\
-var dailyBackground = false; // if set to false, your background will be the same everyday. if set to true, your background will cycle through bg1 to bg31 depending on the day of the month
-var singleBackground = "bg5"; // your background, you can choose from bg1 to bg31, you can also change the URL in the @ressource area to choose any image on the internet. beware : large images may result in visual glitches during page load.
+var imageBackground = "bg_image"; // your background, you can customize it by changing the URL at line 9. https://super-duper.fr/img/magga/bg001.jpg to bg022.jpg are some i selected but any link will work, just keep in mind image size affects loading time of the page.
 
-var mainPageBackground = true; // true = replace the main page background.
-var menusBackground = true; // true = replace the single player and multiplayer pages background.
-var lobbyBackground = true; //true = replace the multiplayer lobbys background;
+var menusBackground = true; // true = replace background in main page, single player menu and multiplayer menu
+var lobbyBackground = true; //true = replace background in the multiplayer lobbys (like team duels)
+var profileBackground = true; //true = replace background in profile pages
 
 var singlePlayerIcons = true; // true = replace avatars with nice icons in single player menu.
 var multiplayerIcons = true; // true = replace avatars with nice icons in multiplayer menu.
@@ -85,10 +51,11 @@ var elementList = [ "deal-promo-button_root__nUfyK", //avatars ads
 
 
 //init background
-var day = new Date().getDate();
-var background_URL;
-if (dailyBackground) {background_URL = await GM.getResourceUrl("bg"+day); }
-else {background_URL = await GM.getResourceUrl(singleBackground);}
+var background_URL = await GM.getResourceUrl(imageBackground);
+var mainBackgroundElement;
+removeBackgroundFirstPass();
+
+
 
 //init single player and multiplayer icons
 var multi_country_URL = await GM.getResourceUrl("multi_country");
@@ -107,7 +74,7 @@ var live_icon_URL = await GM.getResourceUrl("live_icon");
 var nIntervId = setInterval(removeReturningNodes, 250);
 
 
-//------------------------------------------------------------------------------------------------------MAIN FUNCTION---------------------------------------------------------------------------------------------\\
+//------------------------------------------------------------------------------------------------------REMOVE RETURNING ELEMENTS---------------------------------------------------------------------------------------------\\
 function removeReturningNodes() {
 
     //remove unwanted elements
@@ -118,12 +85,12 @@ function removeReturningNodes() {
         }
     }
 
-    //apply background
-    removeBackground();
-    //apply icons in single player menu
+        //apply icons in single player menu
     if (singlePlayerIcons) {changeSinglePlayerImages();}
     //apply icons in multiplyer menu
     if (multiplayerIcons) {changeMultiplayerImages();}
+
+    removeBackground();
 }
 
 
@@ -131,32 +98,51 @@ function removeReturningNodes() {
 function removeBackground() {
 
     var body = document.getElementsByTagName('body')[0];
-    body.style.background = 'transparent';
+    body.style.background = 'black';
     body.style.backgroundImage = "url("+ background_URL +")";
     body.style.backgroundRepeat = "no-repeat";
     body.style.backgroundSize = "100% 100%";
+  
 
-    if (mainPageBackground) {
-    var backgroundMainPage = document.getElementsByClassName("background_backgroundHome__lurxW");
+  if (menusBackground) {
+    var backgroundMainPage = document.getElementsByClassName("background_wrapper__OlrxG");
     if (backgroundMainPage != undefined) {
         if (backgroundMainPage.length > 0 ) {
             let backgroundElement = backgroundMainPage[0];
-            $(backgroundElement).removeClass ("background_wrapper__OlrxG");
-            $(backgroundElement).removeClass ("background_backgroundHome__lurxW");
+            if (menusBackground) {
+                $(backgroundElement).removeClass ("background_wrapper__OlrxG");
+                $(backgroundElement).removeClass ("background_backgroundHome__lurxW");
+                $(backgroundElement).removeClass("background_backgroundMultiplayer__TLhIS");
+                $(backgroundElement).removeClass("background_backgroundClassic__ySr_Z");}
+            if (profileBackground) {$(backgroundElement).removeClass("background_backgroundProfile__EY4oP");}
         }
     }
-    }
+    
 
-    if (menusBackground) {
-      var backgroundMultiplayerMenu = document.getElementsByClassName("background_backgroundMultiplayer__TLhIS");
+
+      var backgroundMultiplayerMenu = document.getElementsByClassName("background_background__8Zm0Y");
         if (backgroundMultiplayerMenu != undefined) {
-        if (backgroundMultiplayerMenu.length >0) {
-            let backgroundElement =backgroundMultiplayerMenu[0];
-            $(backgroundElement).removeClass ("background_wrapper__OlrxG");
-            $(backgroundElement).removeClass ("background_backgroundMultiplayer__TLhIS");
+            if (backgroundMultiplayerMenu.length >0) {
+                let backgroundElement =backgroundMultiplayerMenu[0];
+
+            if (menusBackground) {
+                $(backgroundElement).removeClass("background_wrapper__OlrxG");
+                $(backgroundElement).removeClass("background_backgroundHome__lurxW");
+                $(backgroundElement).removeClass("background_backgroundMultiplayer__TLhIS");
+                $(backgroundElement).removeClass("background_backgroundClassic__ySr_Z");}
+            if (profileBackground) {$(backgroundElement).removeClass("background_backgroundProfile__EY4oP");}
+            }
         }
-    }
-    }
+
+        var explorerMap =document.getElementsByClassName("world-map_worldMap__ZAPD7");
+         if (explorerMap != undefined) {
+             if (explorerMap.length >0) {
+                 let Element =explorerMap[0];
+                 Element.style.backgroundColor = "rgba(0,0,0,0.7)";
+             }
+         }
+
+  }
 
     if (lobbyBackground) {
     var backgroundMultiplayerLobby = document.getElementsByClassName("in-game_root__3hGRu in-game_backgroundDefault__UDbvo"); // "party_root__EQz_N party_withSideTray__Ffx0K"
@@ -194,6 +180,141 @@ function removeBackground() {
 
 
 }
+
+//------------------------------------------------------------------------------------------------------BACKGROUNDS---------------------------------------------------------------------------------------------\\
+async function removeBackgroundFirstPass() {
+
+    var blocked1 = false;
+    var blocked2 = false;
+    var bg1;
+    var bg2;
+
+    var body = document.getElementsByTagName('body')[0];
+    body.style.background = 'transparent';
+    body.style.backgroundImage = "url("+ background_URL +")";
+    body.style.backgroundSize = "100% 100%";
+
+
+    if (menusBackground) {
+    var backgroundMainPage = document.getElementsByClassName("background_wrapper__OlrxG");
+    if (backgroundMainPage != undefined) {
+        if (backgroundMainPage.length > 0 ) {
+            let backgroundElement = backgroundMainPage[0];
+            bg1 = backgroundElement;
+            //bg1.id = "bg1";
+            if (menusBackground) {
+            $(backgroundElement).removeClass("background_wrapper__OlrxG");
+            $(backgroundElement).removeClass("background_backgroundHome__lurxW");
+            $(backgroundElement).removeClass("background_backgroundMultiplayer__TLhIS");
+            $(backgroundElement).removeClass("background_backgroundClassic__ySr_Z");}
+            if (profileBackground) {$(backgroundElement).removeClass("background_backgroundProfile__EY4oP");}
+
+            const observerMainPage1 = new MutationObserver((mutations) => {
+               if (blocked1) {blocked1 = false; return;}
+          mutations.forEach( function (mutation) {
+              if (mutation.type === "attributes" && mutation.attributeName == "class" && mutation.target.classList != undefined && mutation.target.classList[0] == "background_wrapper__OlrxG") {
+                  blocked1 = true;
+                  if (menusBackground) {
+                  $(mutation.target).removeClass("background_wrapper__OlrxG");
+                  $(mutation.target).removeClass("background_backgroundHome__lurxW");
+                  $(mutation.target).removeClass("background_backgroundMultiplayer__TLhIS");
+                  $(mutation.target).removeClass("background_backgroundClassic__ySr_Z");
+                  }
+                  if (profileBackground) {$(mutation.target).removeClass("background_backgroundProfile__EY4oP");}
+                  console.log("removed1");
+              }
+
+              if (mutation.type === "attributes" && mutation.attributeName == "class" && mutation.target.classList != undefined && mutation.target.classList[0] == "in-game_root__3hGRu") {
+                  blocked1 = true;
+              $(mutation.target).removeClass("in-game_backgroundDefault__UDbvo");
+                  console.log("removed1");
+              }
+
+            if (mutation.type === "childList") {
+            [mutation.addedNodes].forEach((addedNode) => {
+                //console.log(addedNode);
+                if (addedNode != undefined && addedNode.length >0) {
+                /*console.log("addedNode0 :");
+                console.log(addedNode[0].classList);
+                    console.log(addedNode[0].classList[0]);
+                    console.log(addedNode[0].classList != undefined);*/
+
+            if (addedNode[0].classList != undefined && addedNode[0].classList[0] != undefined && addedNode[0].classList[0] == "background_background__8Zm0Y") {
+                console.log("removed3");
+                if (menusBackground) {
+                    $(addedNode[0]).removeClass("background_backgroundMultiplayer__TLhIS");
+                    $(addedNode[0]).removeClass("background_backgroundHome__lurxW");
+                $(addedNode[0]).removeClass ("in-game_backgroundDefault__UDbvo");
+                $(addedNode[0]).removeClass ("background_backgroundClassic__ySr_Z");}
+                if (profileBackground) {$(addedNode[0]).removeClass("background_backgroundProfile__EY4oP");}
+
+            }
+            }
+            })
+            }
+
+          }
+          )
+          });
+          observerMainPage1.observe(bg1, { attributes : true, childList : true, subtree : true});
+
+        }
+    }
+
+    backgroundMainPage = document.getElementsByClassName("background_background__8Zm0Y");
+    if (backgroundMainPage != undefined) {
+        if (backgroundMainPage.length > 0 ) {
+            let backgroundElement = backgroundMainPage[0];
+            bg2 = backgroundElement;
+            if (menusBackground) {
+            $(backgroundElement).removeClass("background_backgroundMultiplayer__TLhIS");
+            $(backgroundElement).removeClass("background_backgroundHome__lurxW");}
+            if (profileBackground) {$(backgroundElement).removeClass("background_backgroundProfile__EY4oP");}
+        }
+    }
+    }
+
+
+
+    if (lobbyBackground) {
+    var backgroundMultiplayerLobby = document.getElementsByClassName("in-game_root__3hGRu in-game_backgroundDefault__UDbvo"); // "party_root__EQz_N party_withSideTray__Ffx0K"
+        if (backgroundMultiplayerLobby != undefined) {
+            if (backgroundMultiplayerLobby.length >0) {
+                let backgroundElement = backgroundMultiplayerLobby[0];
+                $(backgroundElement).removeClass ("in-game_backgroundDefault__UDbvo");
+        }
+        }
+
+        var backgroundMultiplayerLobby2 = document.getElementsByClassName("party_root__EQz_N party_withSideTray__Ffx0K"); //
+        if (backgroundMultiplayerLobby2 != undefined) {
+            if (backgroundMultiplayerLobby2.length >0) {
+                let backgroundElement = backgroundMultiplayerLobby2[0];
+                $(backgroundElement).removeClass ("party_root__EQz_N");
+                backgroundElement.style.display = "grid";
+                backgroundElement.style.flexGrow = "1";
+                backgroundElement.style.gridTemplateRows = "5rem 1fr auto";
+        }
+        }
+
+        var backgroundMultiplayerLobbyBottom = document.getElementsByClassName("party-footer_root__Rz_io");
+        if (backgroundMultiplayerLobbyBottom != undefined) {
+            if (backgroundMultiplayerLobbyBottom.length >0) {
+                let backgroundElement = backgroundMultiplayerLobbyBottom[0];
+               $(backgroundElement).removeClass ("party-footer_root__Rz_io");
+                backgroundElement.style.alignItems = "center";
+                backgroundElement.style.boxSizing = "border-box";
+                backgroundElement.style.display = "flex";
+                backgroundElement.style.flexDirection = "column";
+                backgroundElement.style.maxWidth = "100vw";
+        }
+        }
+    }
+
+
+}
+
+
+
 
 //------------------------------------------------------------------------------------------------------SINGLE PLAYER MENU---------------------------------------------------------------------------------------------\\
 function changeSinglePlayerImages() {
@@ -422,5 +543,9 @@ function changeMultiplayerImages() {
             liveChallengeList[0].src = live_icon_URL;
         }
      }
+}
+
+function rmClass(element, str) {
+element.class = element.class.replaceAll(str,"");
 }
 
