@@ -1,10 +1,15 @@
 // ==UserScript==
-// @name     MAGGA script
-// @description remove ads from geoguessr pages
-// @version  1.0
-// @author  .flamby.
-// @require  http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js
-// @include        /^(https?)?(\:)?(\/\/)?([^\/]*\.)?geoguessr\.com($|\/.*)/
+// @name         GeoGuessr Background Replacer
+// @description  Replaces the background of the geoguessr pages with your own images
+// @version      2.0.1
+// @author       Tyow#3742
+// @match        *://*.geoguessr.com/*
+// @license      MIT
+// @require      https://unpkg.com/@popperjs/core@2.11.5/dist/umd/popper.min.js
+// @namespace    https://greasyfork.org/users/1011193
+// @grant        GM_addStyle
+// @grant        GM_setValue
+// @grant        GM_getValue
 // @grant GM.getResourceUrl
 // @resource bg_image https://super-duper.fr/img/magga/bg001.jpg
 // @resource multi_country https://super-duper.fr/img/magga/flag.png
@@ -18,43 +23,58 @@
 // @resource single_daily https://super-duper.fr/img/magga/calendar.png
 // @resource multi_season_icon https://super-duper.fr/img/magga/beach.png
 // @resource live_icon https://super-duper.fr/img/magga/live2.png
-// @run-at document-start
+// @require      https://greasyfork.org/scripts/460322-geoguessr-styles-scan/code/Geoguessr%20Styles%20Scan.js?version=1151668
 // ==/UserScript==
-// MAke Geoguessr Great Again
-// background images come from Pexel free library.
 
+// Some code for popup adapted from blink script: https://greasyfork.org/en/scripts/438579-geoguessr-blink-mode
 
-//------------------------------------------------------------------------------------------------------------OPTIONS ----------------------------------------------------------------------------------\\
-var imageBackground = "bg_image"; // your background, you can customize it by changing the URL at line 9. https://super-duper.fr/img/magga/bg001.jpg to bg022.jpg are some i selected but any link will work, just keep in mind image size affects loading time of the page.
+/* ############################################################################### */
+/* ##### DON'T MODIFY ANYTHING BELOW HERE UNLESS YOU KNOW WHAT YOU ARE DOING ##### */
+/* ############################################################################### */
 
-var menusBackground = true; // true = replace background in main page, single player menu and multiplayer menu
-var lobbyBackground = true; //true = replace background in the multiplayer lobbys (like team duels)
-var profileBackground = true; //true = replace background in profile pages
-
+const guiHTMLHeader = `
+<div id="backgroundReplacerPopupWrapper">
+  <div id="backgroundReplacerSearchWrapper">
+    <div id="backgroundReplacerSlantedRoot">
+      <div id="backgroundReplacerSlantedStart"></div>
+      <div id="backgroundReplacerInputWrapper">
+        <div id="backgroundReplacerPopup" style="background: rgba(26, 26, 46, 0.9); padding: 15px; border-radius: 10px; max-height: 80vh; overflow-y: auto; width: 28em">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <span id="backgroundReplacerLabel1" style="margin: 0; padding-right: 6px;">Add Home Page image</span>
+            <input type="url" id="homepageInput" name="homepage" style="background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 5px">
+          </div>
+          <span>Home Page Images:</span>
+          <div id="homePageImages" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-direction: column"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <span id="backgroundReplacerLabel2" style="margin: 0; padding-right: 6px;">Add Other Page Image</span>
+            <input type="url" id="otherpagesInput" name="otherpages" style="background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 5px">
+          </div>
+          <span>Other Pages Images:</span>
+          <div id="otherPagesImages" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-direction: column"></div>
+        </div>
+        <button style="width: 59.19px" id="backgroundReplacerToggle"><picture id="backgroundReplacerTogglePicture" style="justify-content: center"><img src="https://www.svgrepo.com/show/342899/wallpaper.svg" style="width: 15px; filter: brightness(0) invert(1); opacity: 60%;"></picture></button>
+      </div>
+      <div id="backgroundReplacerSlantedEnd"></div>
+    </div>
+  </div>
+</div>
+`
 var singlePlayerIcons = true; // true = replace avatars with nice icons in single player menu.
 var multiplayerIcons = true; // true = replace avatars with nice icons in multiplayer menu.
+var removeMissions = false; // true = hide the yellow flag button with daily missions.
 
 var bg_color = "rgba(14,31,40,0.7)"; // background color for the blocks in single player and multiplayer menus.
 var bg_color_darker = "hsla(0,0%,100%,.1)"; // background color for multiplayer ranked blocks.
 
-//------------------------------------------------------------------------------------------------------CODE---------------------------------------------------------------------------------------------\\
-
 //list of elements to remove from all pages
 var elementList = [ "deal-promo-button_root__nUfyK", //avatars ads
-                   "slanted-button_container__6JmyZ", //avatar ads
                    "maprunner-signed-in-start-page_backgroundWrapper__LOeXW", //main page maprunner background
                    "maprunner-signed-in-start-page_avatar__gAHLT", //main page giant avatar
                    "primary-menu-button_flair__DERJi", //yellow new season button
                    "footer_footer__tc8Gv", //social medias links
                    "promo-card_card__nNmEk" //avatar ads
                   ];
-
-
-//init background
-var background_URL = await GM.getResourceUrl(imageBackground);
-var mainBackgroundElement;
-removeBackgroundFirstPass();
-
+if (removeMissions) {elementList.push("slanted-button_container__6JmyZ");}
 
 
 //init single player and multiplayer icons
@@ -70,248 +90,433 @@ var single_streak_URL = await GM.getResourceUrl("single_streak");
 var single_daily_URL = await GM.getResourceUrl("single_daily");
 var live_icon_URL = await GM.getResourceUrl("live_icon");
 
-//call the main function at regular intervals
-var nIntervId = setInterval(removeReturningNodes, 250);
+let homePageImageList = GM_getValue("homepageImages");
+let otherImages = GM_getValue("otherImages");
 
 
-//------------------------------------------------------------------------------------------------------REMOVE RETURNING ELEMENTS---------------------------------------------------------------------------------------------\\
-function removeReturningNodes() {
+// Defaults
+if (homePageImageList == undefined) {
+    homePageImageList = [
+        "https://cdn.wallpapersafari.com/6/80/9ZbpYo.jpg",
+        "https://cdn.wallpapersafari.com/25/72/dtkc16.jpg",
+        "https://i.imgur.com/l9K9IOq.jpg",
+    ];
+    GM_setValue("homepageImages", homePageImageList);
+}
+if (otherImages == undefined) {
+    otherImages = [
+        "https://imgur.com/eK23SeH.jpg",
+        "https://i.imgur.com/l9K9IOq.jpg"
+    ];
+    GM_setValue("otherImages", otherImages);
+}
 
-    //remove unwanted elements
-    for (var i=0;i<elementList.length;i++) {
-        var el = document.getElementsByClassName(elementList[i]);
-        if (el != undefined) {
-            if (el.length>0) { el[0].style.display = "none";}
-        }
+let hide = false;
+let styles = GM_getValue("backgroundReplacerStyles");
+if (!styles) {
+    hide = true;
+    styles = {};
+}
+
+let homePageImgURL;
+
+
+
+const setHomePageImg = () => {
+    if(homePageImageList.length) {
+        homePageImgURL = homePageImageList[Math.floor((Math.random()*homePageImageList.length))];
+    } else {
+        homePageImgURL = "";
     }
+}
 
-        //apply icons in single player menu
-    if (singlePlayerIcons) {changeSinglePlayerImages();}
-    //apply icons in multiplyer menu
-    if (multiplayerIcons) {changeMultiplayerImages();}
+setHomePageImg();
 
-    removeBackground();
+let otherPagesImgURL;
+
+const setOtherImg = () => {
+    if(otherImages.length) {
+        otherPagesImgURL = otherImages[Math.floor((Math.random()*otherImages.length))];
+    } else {
+        otherPagesImgURL = "";
+    }
+}
+
+setOtherImg();
+
+let css = `.customBackground { bottom: 0;
+display: block;
+height: 100%;
+object-fit: cover;
+pointer-events: none;
+position: fixed;
+right: 0;
+transition: .2s ease-in-out;
+width: 100%;
+}
+.zindex {
+  z-index: -1;
+}
+.deleteIcon {
+    width: 25px;
+    filter: brightness(0) invert(1);
+    opacity: 60%;
+}
+.backgroundImage {
+    width: 20em;
+}
+.deleteButton {
+    width: 59.19px;
+    margin-bottom: 8em;
+}
+.backgroundImageWrapper {
+    display: flex;
+    padding: .5em;
+}
+.deleteIconPicture {
+   justifyContent:center;
+}
+
+`;
+GM_addStyle(css);
+
+
+const showPopup = (showButton, popup) => {
+    popup.style.display = 'block';
+    Popper.createPopper(showButton, popup, {
+        placement: 'bottom',
+        modifiers: [
+            {
+                name: 'offset',
+                options: {
+                    offset: [0, 10],
+                },
+            },
+        ],
+    });
+}
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+const iterativeSetTimeout = async (func, delay, cond) => {
+    while (!cond()) {
+        await delay(delay);
+        await func();
+        delay *= 2;
+    }
+};
+
+// Caching system for styles
+// Basically, we have a browser stored styles object,
+// which contains the most recent classNames found by scanStyles()
+// This is what the script will immediately use upon loading,
+// so that there's no pause in delivering the UI to the user
+// But the script will also fire off this function
+// which will use the above iterativeSetTimeout function to call scanStyles
+// This is so there aren't a thousand calls in quick succession.
+// Once all the classNames we're looking for are found,
+// it will update the local storage and the ui with the (possibly) new classnames
+const uploadDownloadStyles = async () => {
+    await iterativeSetTimeout(scanStyles, 0.1, () => checkAllStylesFound(["header_item__",
+                                                                          "quick-search_wrapper__",
+                                                                          "slanted-wrapper_root__",
+                                                                          "slanted-wrapper_variantGrayTransparent__",
+                                                                          "slanted-wrapper_start__",
+                                                                          "slanted-wrapper_right__",
+                                                                          "quick-search_searchInputWrapper__",
+                                                                          "slanted-wrapper_end__",
+                                                                          "slanted-wrapper_right__",
+                                                                          "quick-search_searchInputButton__",
+                                                                          "game-options_optionLabel__",
+                                                                          "game-options_optionLabel__",
+                                                                          "quick-search_iconSection__",
+                                                                          "quick-search_searchInputButton__"]) !== undefined);
+    if (hide) {
+        document.querySelector("#backgroundReplacerPopupWrapper").hidden = "";
+    }
+    styles["header_item__"] = cn("header_item__");
+    styles["quick-search_wrapper__"] = cn("quick-search_wrapper__");
+    styles["slanted-wrapper_root__"] = cn("slanted-wrapper_root__");
+    styles["slanted-wrapper_variantGrayTransparent__"] = cn("slanted-wrapper_variantGrayTransparent__");
+    styles["slanted-wrapper_start__"] = cn("slanted-wrapper_start__");
+    styles["slanted-wrapper_right__"] = cn("slanted-wrapper_right__");
+    styles["quick-search_searchInputWrapper__"] = cn("quick-search_searchInputWrapper__");
+    styles["slanted-wrapper_end__"] = cn("slanted-wrapper_end__");
+    styles["quick-search_searchInputButton__"] = cn("quick-search_searchInputButton__");
+    styles["game-options_optionLabel__"] = cn("game-options_optionLabel__");
+    styles["quick-search_iconSection__"] = cn("quick-search_iconSection__");
+    styles["quick-search_searchInputButton__"] = cn("quick-search_searchInputButton__");
+    GM_setValue("backgroundReplacerStyles", styles);
+    setStyles()
+}
+
+const setStyles = () => {
+    document.querySelector("#backgroundReplacerPopupWrapper").className = styles["header_item__"];
+    document.querySelector("#backgroundReplacerSearchWrapper").className = styles["quick-search_wrapper__"];
+    document.querySelector("#backgroundReplacerSlantedRoot").className = styles["slanted-wrapper_root__"]+ " " + styles["slanted-wrapper_variantGrayTransparent__"];
+    document.querySelector("#backgroundReplacerSlantedStart").className = styles["slanted-wrapper_start__"]+ " " + styles["slanted-wrapper_right__"];
+    document.querySelector("#backgroundReplacerInputWrapper").className = styles["quick-search_searchInputWrapper__"];
+    document.querySelector("#backgroundReplacerSlantedEnd").className = styles["slanted-wrapper_end__"]+ " " + styles["slanted-wrapper_right__"];
+    document.querySelector("#backgroundReplacerToggle").className = styles["quick-search_searchInputButton__"];
+    document.querySelector("#backgroundReplacerLabel1").className = styles["game-options_optionLabel__"];
+    document.querySelector("#backgroundReplacerLabel2").className = styles["game-options_optionLabel__"];
+    document.querySelector("#backgroundReplacerTogglePicture").className = styles["quick-search_iconSection__"];
+    document.querySelectorAll(".deleteButton").forEach(el => el.className = el.className + " " + cn("quick-search_searchInputButton__"));
 }
 
 
-//------------------------------------------------------------------------------------------------------BACKGROUNDS---------------------------------------------------------------------------------------------\\
-function removeBackground() {
+const insertHeaderGui = async (header, gui) => {
 
-    var body = document.getElementsByTagName('body')[0];
-    body.style.background = 'black';
-    body.style.backgroundImage = "url("+ background_URL +")";
-    body.style.backgroundRepeat = "no-repeat";
-    body.style.backgroundSize = "100% 100%";
-  
+    header.insertAdjacentHTML('afterbegin', gui);
 
-  if (menusBackground) {
-    var backgroundMainPage = document.getElementsByClassName("background_wrapper__OlrxG");
-    if (backgroundMainPage != undefined) {
-        if (backgroundMainPage.length > 0 ) {
-            let backgroundElement = backgroundMainPage[0];
-            if (menusBackground) {
-                $(backgroundElement).removeClass ("background_wrapper__OlrxG");
-                $(backgroundElement).removeClass ("background_backgroundHome__lurxW");
-                $(backgroundElement).removeClass("background_backgroundMultiplayer__TLhIS");
-                $(backgroundElement).removeClass("background_backgroundClassic__ySr_Z");}
-            if (profileBackground) {$(backgroundElement).removeClass("background_backgroundProfile__EY4oP");}
-        }
+    // Resolve class names
+    if (hide) {
+        document.querySelector("#backgroundReplacerPopupWrapper").hidden = "true"
     }
-    
+
+    scanStyles().then(() => uploadDownloadStyles());
+    setStyles();
 
 
-      var backgroundMultiplayerMenu = document.getElementsByClassName("background_background__8Zm0Y");
-        if (backgroundMultiplayerMenu != undefined) {
-            if (backgroundMultiplayerMenu.length >0) {
-                let backgroundElement =backgroundMultiplayerMenu[0];
 
-            if (menusBackground) {
-                $(backgroundElement).removeClass("background_wrapper__OlrxG");
-                $(backgroundElement).removeClass("background_backgroundHome__lurxW");
-                $(backgroundElement).removeClass("background_backgroundMultiplayer__TLhIS");
-                $(backgroundElement).removeClass("background_backgroundClassic__ySr_Z");}
-            if (profileBackground) {$(backgroundElement).removeClass("background_backgroundProfile__EY4oP");}
+    const showButton = document.querySelector('#backgroundReplacerToggle');
+    const popup = document.querySelector('#backgroundReplacerPopup');
+    popup.style.display = 'none';
+
+    document.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target == popup || popup.contains(target) || !document.contains(target)) return;
+        if (target.matches('#backgroundReplacerToggle, #backgroundReplacerToggle *')) {
+            e.preventDefault();
+            showPopup(showButton, popup);
+        } else {
+            popup.style.display = 'none';
+        }
+
+        if (document.querySelector('#enableScriptHeader')) {
+            if (localStorage.getItem('blinkEnabled') === 'enabled') {
+                document.querySelector('#enableScriptHeader').checked = true;
             }
         }
-
-        var explorerMap =document.getElementsByClassName("world-map_worldMap__ZAPD7");
-         if (explorerMap != undefined) {
-             if (explorerMap.length >0) {
-                 let Element =explorerMap[0];
-                 Element.style.backgroundColor = "rgba(0,0,0,0.7)";
-             }
-         }
-
-  }
-
-    if (lobbyBackground) {
-    var backgroundMultiplayerLobby = document.getElementsByClassName("in-game_root__3hGRu in-game_backgroundDefault__UDbvo"); // "party_root__EQz_N party_withSideTray__Ffx0K"
-        if (backgroundMultiplayerLobby != undefined) {
-            if (backgroundMultiplayerLobby.length >0) {
-                let backgroundElement = backgroundMultiplayerLobby[0];
-                $(backgroundElement).removeClass ("in-game_backgroundDefault__UDbvo");
-        }
-        }
-
-        var backgroundMultiplayerLobby2 = document.getElementsByClassName("party_root__EQz_N party_withSideTray__Ffx0K"); //
-        if (backgroundMultiplayerLobby2 != undefined) {
-            if (backgroundMultiplayerLobby2.length >0) {
-                let backgroundElement = backgroundMultiplayerLobby2[0];
-                $(backgroundElement).removeClass ("party_root__EQz_N");
-                backgroundElement.style.display = "grid";
-                backgroundElement.style.flexGrow = "1";
-                backgroundElement.style.gridTemplateRows = "5rem 1fr auto";
-        }
-        }
-
-        var backgroundMultiplayerLobbyBottom = document.getElementsByClassName("party-footer_root__Rz_io");
-        if (backgroundMultiplayerLobbyBottom != undefined) {
-            if (backgroundMultiplayerLobbyBottom.length >0) {
-                let backgroundElement = backgroundMultiplayerLobbyBottom[0];
-               $(backgroundElement).removeClass ("party-footer_root__Rz_io");
-                backgroundElement.style.alignItems = "center";
-                backgroundElement.style.boxSizing = "border-box";
-                backgroundElement.style.display = "flex";
-                backgroundElement.style.flexDirection = "column";
-                backgroundElement.style.maxWidth = "100vw";
-        }
-        }
-    }
-
-
+    });
 }
 
-//------------------------------------------------------------------------------------------------------BACKGROUNDS---------------------------------------------------------------------------------------------\\
-async function removeBackgroundFirstPass() {
+// Global to track whether the most recent image insertion was done on homepage
+let isHomePage = location.pathname == "/";
 
-    var blocked1 = false;
-    var blocked2 = false;
-    var bg1;
-    var bg2;
+const insertBackground = (refresh=false) => {
+    let inGame = false;
+    let el = document.querySelector("[class^='background_wrapper']");
+    if (!el) {
+        inGame = true;
+        el = document.querySelector("#__next");
+        if (!el) return;
+        // Because this element has multiple classes, we need to use a different selector
+        const def = document.querySelector("[class*=in-game_backgroundDefault__]");
+        let reg = /^in-game_backgroundDefault__/;
+        if (def) {
+            def.classList = Array.from(def.classList).filter(cl => !cl.match(reg));
+        }
+        const partyRoot = document.querySelector("[class^=party_root__]");
+        if (partyRoot) {
+            partyRoot.style.background = "none";
+        }
+        // Without this, you can see the background behind the map in a game summary
 
-    var body = document.getElementsByTagName('body')[0];
-    body.style.background = 'transparent';
-    body.style.backgroundImage = "url("+ background_URL +")";
-    body.style.backgroundSize = "100% 100%";
+        // Purple color used by geoguessr, with .9 alpha
+        const purple9 = "rgba(12 12 46 / .9)";
+        // .7 alpha
+        const purple7 = "rgba(12 12 46 / .7)";
+        const gameSummary = document.querySelector("[class^=game-summary_container__");
+        if (gameSummary) {
+            gameSummary.style.opacity = "1";
+            gameSummary.style.backgroundColor = purple9;
+        }
+        const header = document.querySelector("[class^=game-summary_playedRoundsHeader__");
+        if (header) {
+            header.style.backgroundColor = purple7;
+        }
 
-
-    if (menusBackground) {
-    var backgroundMainPage = document.getElementsByClassName("background_wrapper__OlrxG");
-    if (backgroundMainPage != undefined) {
-        if (backgroundMainPage.length > 0 ) {
-            let backgroundElement = backgroundMainPage[0];
-            bg1 = backgroundElement;
-            //bg1.id = "bg1";
-            if (menusBackground) {
-            $(backgroundElement).removeClass("background_wrapper__OlrxG");
-            $(backgroundElement).removeClass("background_backgroundHome__lurxW");
-            $(backgroundElement).removeClass("background_backgroundMultiplayer__TLhIS");
-            $(backgroundElement).removeClass("background_backgroundClassic__ySr_Z");}
-            if (profileBackground) {$(backgroundElement).removeClass("background_backgroundProfile__EY4oP");}
-
-            const observerMainPage1 = new MutationObserver((mutations) => {
-               if (blocked1) {blocked1 = false; return;}
-          mutations.forEach( function (mutation) {
-              if (mutation.type === "attributes" && mutation.attributeName == "class" && mutation.target.classList != undefined && mutation.target.classList[0] == "background_wrapper__OlrxG") {
-                  blocked1 = true;
-                  if (menusBackground) {
-                  $(mutation.target).removeClass("background_wrapper__OlrxG");
-                  $(mutation.target).removeClass("background_backgroundHome__lurxW");
-                  $(mutation.target).removeClass("background_backgroundMultiplayer__TLhIS");
-                  $(mutation.target).removeClass("background_backgroundClassic__ySr_Z");
-                  }
-                  if (profileBackground) {$(mutation.target).removeClass("background_backgroundProfile__EY4oP");}
-                  console.log("removed1");
-              }
-
-              if (mutation.type === "attributes" && mutation.attributeName == "class" && mutation.target.classList != undefined && mutation.target.classList[0] == "in-game_root__3hGRu") {
-                  blocked1 = true;
-              $(mutation.target).removeClass("in-game_backgroundDefault__UDbvo");
-                  console.log("removed1");
-              }
-
-            if (mutation.type === "childList") {
-            [mutation.addedNodes].forEach((addedNode) => {
-                //console.log(addedNode);
-                if (addedNode != undefined && addedNode.length >0) {
-                /*console.log("addedNode0 :");
-                console.log(addedNode[0].classList);
-                    console.log(addedNode[0].classList[0]);
-                    console.log(addedNode[0].classList != undefined);*/
-
-            if (addedNode[0].classList != undefined && addedNode[0].classList[0] != undefined && addedNode[0].classList[0] == "background_background__8Zm0Y") {
-                console.log("removed3");
-                if (menusBackground) {
-                    $(addedNode[0]).removeClass("background_backgroundMultiplayer__TLhIS");
-                    $(addedNode[0]).removeClass("background_backgroundHome__lurxW");
-                $(addedNode[0]).removeClass ("in-game_backgroundDefault__UDbvo");
-                $(addedNode[0]).removeClass ("background_backgroundClassic__ySr_Z");}
-                if (profileBackground) {$(addedNode[0]).removeClass("background_backgroundProfile__EY4oP");}
-
-            }
-            }
-            })
-            }
-
-          }
-          )
-          });
-          observerMainPage1.observe(bg1, { attributes : true, childList : true, subtree : true});
-
+    }
+    // We only want the zindex = -1 to exist in game settings, on other pages it's detrimental
+    let img = document.querySelector('.customBackground');
+    if (refresh) {
+        img.remove();
+        img = document.querySelector('.customBackground');
+    }
+    if (img) {
+        if (!inGame) {
+            img.classList = Array.from(img.classList).filter(cl => cl != 'zindex');
+        }
+        // Return if most recent insertion was in same area (homepage vs not)
+        if (isHomePage == (location.pathname == "/")) {
+            return;
+        }
+        img.remove();
+        // Update isHomePage
+    }
+    if (!img) {
+        img = document.createElement("img")
+        img.classList.add("customBackground");
+        if (inGame) {
+            img.classList.add("zindex");
+        } else {
+            img.classList = Array.from(img.classList).filter(cl => cl != 'zindex');
         }
     }
-
-    backgroundMainPage = document.getElementsByClassName("background_background__8Zm0Y");
-    if (backgroundMainPage != undefined) {
-        if (backgroundMainPage.length > 0 ) {
-            let backgroundElement = backgroundMainPage[0];
-            bg2 = backgroundElement;
-            if (menusBackground) {
-            $(backgroundElement).removeClass("background_backgroundMultiplayer__TLhIS");
-            $(backgroundElement).removeClass("background_backgroundHome__lurxW");}
-            if (profileBackground) {$(backgroundElement).removeClass("background_backgroundProfile__EY4oP");}
-        }
+    isHomePage = location.pathname == "/";
+    if (isHomePage && homePageImgURL) {
+        img.src = homePageImgURL;
+    } else if (!isHomePage && otherPagesImgURL) {
+        img.src = otherPagesImgURL;
+    } else {
+        return
     }
-    }
-
-
-
-    if (lobbyBackground) {
-    var backgroundMultiplayerLobby = document.getElementsByClassName("in-game_root__3hGRu in-game_backgroundDefault__UDbvo"); // "party_root__EQz_N party_withSideTray__Ffx0K"
-        if (backgroundMultiplayerLobby != undefined) {
-            if (backgroundMultiplayerLobby.length >0) {
-                let backgroundElement = backgroundMultiplayerLobby[0];
-                $(backgroundElement).removeClass ("in-game_backgroundDefault__UDbvo");
-        }
-        }
-
-        var backgroundMultiplayerLobby2 = document.getElementsByClassName("party_root__EQz_N party_withSideTray__Ffx0K"); //
-        if (backgroundMultiplayerLobby2 != undefined) {
-            if (backgroundMultiplayerLobby2.length >0) {
-                let backgroundElement = backgroundMultiplayerLobby2[0];
-                $(backgroundElement).removeClass ("party_root__EQz_N");
-                backgroundElement.style.display = "grid";
-                backgroundElement.style.flexGrow = "1";
-                backgroundElement.style.gridTemplateRows = "5rem 1fr auto";
-        }
-        }
-
-        var backgroundMultiplayerLobbyBottom = document.getElementsByClassName("party-footer_root__Rz_io");
-        if (backgroundMultiplayerLobbyBottom != undefined) {
-            if (backgroundMultiplayerLobbyBottom.length >0) {
-                let backgroundElement = backgroundMultiplayerLobbyBottom[0];
-               $(backgroundElement).removeClass ("party-footer_root__Rz_io");
-                backgroundElement.style.alignItems = "center";
-                backgroundElement.style.boxSizing = "border-box";
-                backgroundElement.style.display = "flex";
-                backgroundElement.style.flexDirection = "column";
-                backgroundElement.style.maxWidth = "100vw";
-        }
-        }
-    }
-
-
+    el.appendChild(img);
 }
+
+const updateStorage = (listName, newList) => {
+    GM_setValue(listName, newList);
+}
+
+const validate = (e, homepage) => {
+    const patt = new RegExp(".*.(jpg|png|gif|jpeg|webp|svg|avif)","i");
+    if (e.key == "Enter") {
+        if (patt.test(e.target.value)) {
+            if (homepage) {
+                let homepageImages = GM_getValue("homepageImages");
+                homepageImages.push(e.target.value);
+                if (homepageImages.length == 1) {
+                    homePageImgURL = homepageImages[0];
+                }
+                GM_setValue("homepageImages", homepageImages);
+                homePageImageList = homepageImages
+            } else {
+                let otherImagesNew = GM_getValue("otherImages");
+                otherImagesNew.push(e.target.value);
+                if (otherImagesNew.length == 1) {
+                    otherPagesImgURL = otherImagesNew[0];
+                }
+                GM_setValue("otherImages", otherImagesNew);
+                otherImages = otherImagesNew;
+            }
+            refreshPopup();
+            e.target.value = "";
+        } else {
+            window.alert("This link doesn't seem to be to an image file, it should end in .jpg, .jpeg, .png, .gif, .webp, .avif, or .svg");
+        }
+    }
+}
+
+const removeImage = (image, div, list, listName) => {
+    let result = window.confirm("Are you sure you want to remove this image?");
+    if (!result) {
+        return
+    }
+    let i = list.indexOf(image);
+    if (i != -1) {
+        list.splice(i, 1);
+        updateStorage(listName, list);
+        refreshPopup();
+        if (listName == "otherImages" && !list.includes(image)) {
+            setOtherImg();
+            updateImage(true);
+        }
+        if (listName == "homepageImages" && !list.includes(image)) {
+            setHomePageImg();
+            updateImage(true);
+        }
+    }
+};
+
+const displayImage = (image, imagesDiv, list, listName) => {
+    const el = document.createElement("img");
+    const div = document.createElement("div");
+    div.className = "backgroundImageWrapper";
+
+    el.src = image
+    el.className = "backgroundImage";
+    div.appendChild(el);
+
+    const deleteIcon = document.createElement("img");
+    deleteIcon.className = "deleteIcon";
+    deleteIcon.src = "https://www.svgrepo.com/show/493964/delete-1.svg";
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = styles["quick-search_searchInputButton__"] + " " + "deleteButton";
+    deleteButton.appendChild(deleteIcon);
+    deleteButton.addEventListener("click", e => {
+        removeImage(image, div, list, listName);
+    });
+
+    div.appendChild(deleteButton);
+
+    imagesDiv.appendChild(div);
+}
+
+const refreshPopup = () => {
+    if (document.querySelector('[class^=header_header__]') && document.querySelector('#backgroundReplacerPopupWrapper')) {
+        let div = document.querySelector("#homePageImages");
+        while (div.children.length) {
+            div.removeChild(div.children[0]);
+        }
+        div = document.querySelector("#otherPagesImages");
+        while (div.children.length) {
+            div.removeChild(div.children[0]);
+        }
+        addPopup(true);
+        const showButton = document.querySelector('#backgroundReplacerToggle');
+        const popup = document.querySelector('#backgroundReplacerPopup');
+        showPopup(showButton, popup);
+    }
+}
+
+const addPopup = (refresh=false) => {
+    if (refresh || (document.querySelector('[class^=header_header__]') && document.querySelector('#backgroundReplacerPopupWrapper') === null)) {
+        if (!refresh) {
+            insertHeaderGui(document.querySelector('[class^=header_context__]'), guiHTMLHeader)
+            const homepageInput = document.querySelector("#homepageInput");
+            homepageInput.addEventListener("keyup", e => {
+                validate(e, true);
+            });
+            const otherpagesInput = document.querySelector("#otherpagesInput");
+            otherpagesInput.addEventListener("keyup", e => {
+                validate(e, false);
+            });
+        }
+        const homePageImagesDiv = document.querySelector('#homePageImages');
+        if (homePageImagesDiv) {
+            // Loop through images and display them
+            for (let i = 0; i < homePageImageList.length; i++) {
+                displayImage(homePageImageList[i], homePageImagesDiv,homePageImageList, "homepageImages");
+            }
+        }
+        const otherPagesImagesDiv = document.querySelector("#otherPagesImages");
+        if (otherPagesImagesDiv) {
+            // Loop through images and display them
+            for (let i = 0; i < otherImages.length; i++) {
+                displayImage(otherImages[i], otherPagesImagesDiv, otherImages, "otherImages");
+            }
+        }
+    }
+}
+
+const updateImage = (refresh=false) => {
+    // Don't do anything while the page is loading
+    if (document.querySelector("[class^=page-loading_loading__]")) return;
+    addPopup();
+    insertBackground(refresh);
+}
+
+
+
+new MutationObserver(async (mutations) => {
+    updateImage();
+    changeSinglePlayerImages();
+    changeMultiplayerImages();
+    removeMainPageElements();
+
+}).observe(document.body, { subtree: true, childList: true });
 
 
 
@@ -319,35 +524,37 @@ async function removeBackgroundFirstPass() {
 //------------------------------------------------------------------------------------------------------SINGLE PLAYER MENU---------------------------------------------------------------------------------------------\\
 function changeSinglePlayerImages() {
 
-    var layoutList = document.getElementsByClassName("screens_root__S_Vos screens_focusCardWrapper__8iorp");
+  /*  var layoutList = document.getElementsByClassName("screens_root__S_Vos screens_focusCardWrapper__8iorp");
         if (layoutList != undefined) {
             if (layoutList .length >0) {
                 let Element = layoutList[0];
+                Element.classList.remove("screens_root__S_Vos");
+                Element.classList.remove("screens_focusCardWrapper__8iorp");
                 Element.style.minWidth = "var(--containerWidth)";
                 Element.style.display = "grid";
                 Element.style.gap = "2vw";
                 Element.style.gridTemplateArea = "main secondary tertiary";
                 Element.style.gridTemplateColumns = "repeat(3,minmax(0,1fr))";
                 Element.style.transition = "filter .6s ease";
-                $(Element).removeClass("screens_root__S_Vos");
-                $(Element).removeClass("screens_focusCardWrapper__8iorp");
+
             }
-        }
+        }*/
 
 
     var singlePlayerQuickplayList = document.getElementsByClassName("screens_card__WP0M0 screens_card__WP0M0 screens_quickplayCard__gIeOx");
     if (singlePlayerQuickplayList != undefined) {
         if (singlePlayerQuickplayList.length >0) {
             let Element = singlePlayerQuickplayList[0];
-            $(Element).removeClass("screens_quickplayCard__gIeOx");
+            Element.classList.remove("screens_quickplayCard__gIeOx");
             Element.style.backgroundColor = bg_color;
             Element.firstChild.style.flex = "1";
             Element.style.justifyContent = "center";
-            let newImg = document.createElement('img');
-            newImg.style.maxHeight = "40%";
+           /* let newImg = document.createElement('img');
+            newImg.style.maxHeight = "25%";
             newImg.style.objectFit = "contain";
             newImg.src = single_quickplay_URL;
-            Element.insertBefore(newImg, Element.firstChild);
+            var firstC = Element.firstChild;
+            firstC.insertBefore(newImg, firstC.firstChild);*/
         }
     }
 
@@ -355,11 +562,11 @@ function changeSinglePlayerImages() {
     if (singlePlayerMaprunnerList != undefined) {
         if (singlePlayerMaprunnerList.length >0) {
             let Element = singlePlayerMaprunnerList[0];
-            $(Element).removeClass("screens_maprunnerCard__o_Ulp");
+            Element.classList.remove("screens_maprunnerCard__o_Ulp");
             Element.style.backgroundColor = bg_color;
             Element.style.justifyContent = "center";
             let newImg = document.createElement('img');
-            newImg.style.maxHeight = "40%";
+            newImg.style.maxHeight = "30%";
             newImg.style.objectFit = "contain";
             newImg.src = single_maprunner_URL;
             Element.insertBefore(newImg, Element.firstChild);
@@ -369,13 +576,13 @@ function changeSinglePlayerImages() {
         if (singlePlayerClassicList != undefined) {
         if (singlePlayerClassicList.length >0) {
             let Element = singlePlayerClassicList[0];
-            $(Element).removeClass("screens_mapsCard__oXg2H");
+            Element.classList.remove("screens_mapsCard__oXg2H");
             Element.style.backgroundColor = bg_color;
             Element.style.justifyContent = "center";
             Element.firstChild.firstChild.style.display = "none";
             Element.firstChild.children[1].innerHTML = "CLASSIC MAPS";
             let newImg = document.createElement('img');
-            newImg.style.maxHeight = "40%";
+            newImg.style.maxHeight = "30%";
             newImg.style.objectFit = "contain";
             newImg.src = single_classic_URL;
             Element.insertBefore(newImg, Element.firstChild);
@@ -386,7 +593,7 @@ function changeSinglePlayerImages() {
             if (singlePlayerStreakList != undefined) {
         if (singlePlayerStreakList.length >0) {
             let Element = singlePlayerStreakList[0];
-            $(Element).removeClass("screens_streaksCard__cvcTt");
+            Element.classList.remove("screens_streaksCard__cvcTt");
             Element.style.backgroundColor = bg_color;
             Element.style.justifyContent = "center";
             let newImg = document.createElement('img');
@@ -401,7 +608,7 @@ function changeSinglePlayerImages() {
             if (singlePlayerExplorerList != undefined) {
         if (singlePlayerExplorerList.length >0) {
             let Element = singlePlayerExplorerList[0];
-            $(Element).removeClass("screens_explorerCard__BAf3R");
+            Element.classList.remove("screens_explorerCard__BAf3R");
             Element.style.backgroundColor = bg_color;
             Element.style.justifyContent = "center";
             let newImg = document.createElement('img');
@@ -416,7 +623,7 @@ function changeSinglePlayerImages() {
             if (singlePlayerDailyList != undefined) {
         if (singlePlayerDailyList.length >0) {
             let Element = singlePlayerDailyList[0];
-            $(Element).removeClass("screens_dailyCard___jMGE");
+            Element.classList.remove("screens_dailyCard___jMGE");
             Element.style.backgroundColor = bg_color;
             Element.style.justifyContent = "center";
             let newImg = document.createElement('img');
@@ -451,7 +658,7 @@ function changeMultiplayerImages() {
          if (unrankedCountryList != undefined) {
         if (unrankedCountryList.length >0) {
             let Element = unrankedCountryList[0];
-            $(Element).removeClass("unranked_brc__xHUjF");
+            Element.classList.remove("unranked_brc__xHUjF");
             Element.style.backgroundPosition = "50%";
             Element.style.backgroundRepeat = "no-repeat";
             Element.style.borderRadius = "0.5rem";
@@ -493,7 +700,7 @@ function changeMultiplayerImages() {
          if (unrankedDistanceList != undefined) {
         if (unrankedDistanceList.length >0) {
             let Element = unrankedDistanceList[0];
-            $(Element).removeClass("unranked_brd__avH20");
+            Element.classList.remove("unranked_brd__avH20");
             Element.style.backgroundPosition = "50%";
             Element.style.backgroundRepeat = "no-repeat";
             Element.style.borderRadius = "0.5rem";
@@ -514,7 +721,7 @@ function changeMultiplayerImages() {
          if (unrankedDuelList != undefined) {
         if (unrankedDuelList.length >0) {
             let Element = unrankedDuelList[0];
-            $(Element).removeClass("unranked_td__EL4y2");
+            Element.classList.remove("unranked_td__EL4y2");
             Element.style.backgroundPosition = "50%";
             Element.style.backgroundRepeat = "no-repeat";
             Element.style.borderRadius = "0.5rem";
@@ -545,7 +752,14 @@ function changeMultiplayerImages() {
      }
 }
 
-function rmClass(element, str) {
-element.class = element.class.replaceAll(str,"");
-}
+//------------------------------------------------------------------------------------------------------REMOVE RETURNING ELEMENTS---------------------------------------------------------------------------------------------\\
+function removeMainPageElements() {
 
+    //remove unwanted elements
+    for (var i=0;i<elementList.length;i++) {
+        var el = document.getElementsByClassName(elementList[i]);
+        if (el != undefined) {
+            if (el.length>0) { el[0].style.display = "none";}
+        }
+    }
+}
